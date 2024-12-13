@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {
+              OS: windows-latest,
+              TARGET: x86_64-pc-windows-msvc, # 64-bit MSVC (Windows 10+, Windows Server 2016+)
+              NAME: windows-amd64,
+            }
+    runs-on: ${{ matrix.OS }}
+    env:
+      TARGET: ${{ matrix.TARGET }}
+      OS: ${{ matrix.OS }}
+      NAME: ${{ matrix.NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          key: build-cargo-registry-${{matrix.TARGET}}
+      - name: Install rust target
+        shell: bash
+        run: rustup target add $TARGET
+      - name: Extract project name
+        shell: bash
+        run: echo "PROJECT_NAME=$(grep '^name' Cargo.toml | sed 's/^name *= *//;s/\"//g')" >> $GITHUB_ENV
+      - name: Set release tag
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
+            TAG=$GITHUB_REF_NAME
+          else
+            TAG=$GITHUB_SHA
+          fi
+          echo "TAG=$TAG" >> $GITHUB_ENV
+      - name: Run build
+        run: cargo build --locked --release --verbose --target ${{ env.TARGET }}
+      - name: List target
+        shell: bash
+        run: ls -R ./target
+      - name: Compress
+        shell: bash
+        run: |
+          mkdir -p ./artifacts
+          # windows is the only OS using a different convention for executable file name
+          if [[ $OS =~ ^windows.*$ ]]; then
+              EXEC=$PROJECT_NAME.exe
+          else
+              EXEC=$PROJECT_NAME
+          fi
+          mv ./target/$TARGET/release/$EXEC ./$EXEC
+          tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC
+      - name: Archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.NAME }}-${{ env.TAG }}
+          path: ./artifacts/${{ env.PROJECT_NAME }}-${{ matrix.NAME }}-${{ env.TAG }}.tgz
+
+  # deploys to github releases on tag
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+      - name: Display structure of downloaded files
+        run: ls -R ./artifacts
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/*.tgz
