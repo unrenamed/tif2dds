@@ -44,6 +44,7 @@ struct ImageFile {
 struct ImageFileWithFormat<'a> {
     image_file: &'a ImageFile,
     image_format: ImageFileFormat,
+    extra_arguments: Vec<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let nvtools_path = load_nvtools_path()?;
-    let files_with_format = prompt_format_selection(&image_files);
+    let files_with_format = prepare_files_with_format(&image_files);
     let temp_pngs = generate_pngs_if_required(&files_with_format)?;
     let cmd_args = generate_command_args(&files_with_format);
     let execution_result = execute_commands(&nvtools_path, "nvtt_export.exe", &cmd_args);
@@ -121,36 +122,67 @@ fn collect_image_files(args: &[String]) -> Result<Vec<ImageFile>, io::Error> {
         .collect())
 }
 
-fn prompt_format_selection<'a>(files: &'a [ImageFile]) -> Vec<ImageFileWithFormat<'a>> {
-    let formats = [ImageFileFormat::Bc1, ImageFileFormat::Bc3];
-
+fn prepare_files_with_format<'a>(files: &'a [ImageFile]) -> Vec<ImageFileWithFormat<'a>> {
     files
         .iter()
-        .filter(|file| file.file_suffix.is_none())
         .map(|file| {
-            let selected_format = Select::with_theme(&ColorfulTheme::default())
-                .with_prompt(format!(
-                    "Image `{}` has no suffix. Choose the format to use:",
-                    if let Some(extension) = &file.file_extension {
-                        file.file_path
-                            .with_extension(extension)
-                            .display()
-                            .to_string()
-                    } else {
-                        file.file_path.display().to_string()
-                    }
-                ))
-                .default(0)
-                .items(&formats)
-                .interact()
-                .unwrap();
-
-            ImageFileWithFormat {
-                image_file: file,
-                image_format: formats[selected_format],
+            if let Some(suffix) = &file.file_suffix {
+                ImageFileWithFormat {
+                    image_file: file,
+                    image_format: get_nvtools_format(&suffix),
+                    extra_arguments: get_nvtools_arguments(suffix),
+                }
+            } else {
+                ImageFileWithFormat {
+                    image_file: file,
+                    image_format: prompt_format_selection(file),
+                    extra_arguments: vec![],
+                }
             }
         })
         .collect()
+}
+
+// Helper function to determine the format based on suffix
+fn get_nvtools_format(suffix: &str) -> ImageFileFormat {
+    match suffix {
+        "ao" | "rg" | "mt" | "hm" | "lm" => ImageFileFormat::Bc4,
+        "nm" => ImageFileFormat::Bc5,
+        "dirt" => ImageFileFormat::Bc1,
+        _ => unreachable!(),
+    }
+}
+
+// Helper function to determine the extra arguments based on suffix
+fn get_nvtools_arguments(suffix: &str) -> Vec<String> {
+    match suffix {
+        "ao" | "rg" | "mt" | "hm" | "lm" => vec!["--no-mip-gamma-correct".to_string()],
+        "nm" => vec!["--no-mip-gamma-correct".to_string()],
+        _ => vec![],
+    }
+}
+
+fn prompt_format_selection<'a>(file: &'a ImageFile) -> ImageFileFormat {
+    let formats = [ImageFileFormat::Bc1, ImageFileFormat::Bc3];
+
+    let selected_format = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt(format!(
+            "Image `{}` has no suffix. Choose the format to use:",
+            if let Some(extension) = &file.file_extension {
+                file.file_path
+                    .with_extension(extension)
+                    .display()
+                    .to_string()
+            } else {
+                file.file_path.display().to_string()
+            }
+        ))
+        .default(0)
+        .items(&formats)
+        .interact()
+        .unwrap();
+
+    formats[selected_format]
 }
 
 fn generate_pngs_if_required(
@@ -195,18 +227,6 @@ fn generate_command_args(files_with_format: &[ImageFileWithFormat]) -> Vec<Vec<S
         file.file_path.with_extension("dds")
     }
 
-    // Helper function to determine the format and extra arguments based on suffix
-    fn get_format_and_args(suffix: &str) -> Option<(ImageFileFormat, Vec<&'static str>)> {
-        match suffix {
-            "ao" | "rg" | "mt" | "hm" | "lm" => {
-                Some((ImageFileFormat::Bc4, vec!["--no-mip-gamma-correct"]))
-            }
-            "nm" => Some((ImageFileFormat::Bc5, vec!["--no-mip-gamma-correct"])),
-            "dirt" => Some((ImageFileFormat::Bc1, vec![])),
-            _ => None,
-        }
-    }
-
     let mut args_list = Vec::new();
 
     for file_with_format in files_with_format {
@@ -217,29 +237,15 @@ fn generate_command_args(files_with_format: &[ImageFileWithFormat]) -> Vec<Vec<S
         );
         let output = get_output_path(&file_with_format.image_file);
 
-        if let Some(suffix) = &file_with_format.image_file.file_suffix {
-            if let Some((format, extra_args)) = get_format_and_args(suffix) {
-                args_list.push(build_args(
-                    &format,
-                    "normal",
-                    "box",
-                    "5",
-                    output.to_str().unwrap(),
-                    input.to_str().unwrap(),
-                    &extra_args,
-                ));
-            }
-        } else {
-            args_list.push(build_args(
-                &file_with_format.image_format,
-                "normal",
-                "box",
-                "5",
-                output.to_str().unwrap(),
-                input.to_str().unwrap(),
-                &[],
-            ));
-        }
+        args_list.push(build_args(
+            &file_with_format.image_format,
+            "normal",
+            "box",
+            "5",
+            output.to_str().unwrap(),
+            input.to_str().unwrap(),
+            &file_with_format.extra_arguments,
+        ));
     }
 
     args_list
@@ -284,7 +290,7 @@ fn build_args(
     zcmp: &str,
     output: &str,
     input: &str,
-    extra_args: &[&str],
+    extra_args: &[String],
 ) -> Vec<String> {
     let mut args = vec![
         "--format".to_string(),
@@ -299,7 +305,7 @@ fn build_args(
         "--output".to_string(),
         output.to_string(),
     ];
-    args.extend(extra_args.iter().map(|&arg| arg.to_string()));
+    args.extend(extra_args.iter().map(|arg| arg.to_string()));
     args.push(input.to_string());
     args
 }
