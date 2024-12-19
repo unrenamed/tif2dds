@@ -6,42 +6,64 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, io};
 
-const VALID_SUFFIXES: [&str; 5] = ["ao", "rg", "mt", "hm", "nm"];
+const VALID_SUFFIXES: [&str; 7] = ["ao", "rg", "mt", "hm", "nm", "lm", "dirt"];
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum ImageFileFormat {
+    Bc1,
+    Bc3,
+    Bc4,
+    Bc5,
+}
+
+impl ImageFileFormat {
+    fn as_str(&self) -> &str {
+        match self {
+            ImageFileFormat::Bc1 => "bc1",
+            ImageFileFormat::Bc3 => "bc3",
+            ImageFileFormat::Bc4 => "bc4",
+            ImageFileFormat::Bc5 => "bc5",
+        }
+    }
+}
+
+impl std::fmt::Display for ImageFileFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ImageFile {
+    file_path: PathBuf,
+    file_extension: Option<String>,
+    file_suffix: Option<String>,
+}
+
+#[derive(Debug)]
+struct ImageFileWithFormat<'a> {
+    image_file: &'a ImageFile,
+    image_format: ImageFileFormat,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Collect all arguments (excluding the program name)
     let args: Vec<String> = env::args().skip(1).collect();
-
     if args.is_empty() {
-        println!("No files selected.");
-        return Ok(());
+        return Err("No files selected.".into());
     }
 
     println!("Selected file paths:");
-    for file in &args {
-        println!("{}", file);
+    args.iter().for_each(|file| println!("{}", file));
+
+    let image_files = collect_image_files(&args)?;
+    if image_files.is_empty() {
+        return Err("No .tif or .png files found.".into());
     }
 
     let nvtools_path = load_nvtools_path()?;
-    let tif_files: Vec<PathBuf> = args
-        .iter()
-        .map(|path| PathBuf::from(path))
-        .filter(|path| {
-            path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("tif")
-        })
-        .collect();
-
-    if tif_files.is_empty() {
-        println!("No .tif files found in the folder.");
-        return Ok(());
-    }
-
-    let (suffix_files, no_suffix_files) = segregate_files_by_suffix(&tif_files);
-    let no_suffix_with_formats = prompt_format_selection(&no_suffix_files);
-
-    let temp_pngs = create_pngs_if_needed(&no_suffix_with_formats)?;
-    let cmd_args = build_all_command_args(&suffix_files, &no_suffix_with_formats);
-
+    let files_with_format = prompt_format_selection(&image_files);
+    let temp_pngs = generate_pngs_if_required(&files_with_format)?;
+    let cmd_args = generate_command_args(&files_with_format);
     let execution_result = execute_commands(&nvtools_path, "nvtt_export.exe", &cmd_args);
 
     // Ensure cleanup always happens, regardless of success or failure
@@ -57,72 +79,93 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn load_nvtools_path() -> io::Result<String> {
     let current_exe = env::current_exe()?;
-    let exe_dir = current_exe
-        .parent()
-        .expect("Executable must have a parent directory");
+    let exe_dir = current_exe.parent().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, "Executable directory not found.")
+    })?;
     let config_path = exe_dir.join("tif2dds_config.ini");
     let conf = Ini::load_from_file(config_path).expect("No config file is found.");
-    if let Some(section) = conf.section(Some("General")) {
-        if let Some(dir_path) = section.get("nvtoolsdirectory") {
-            return Ok(dir_path.to_string());
-        }
-    }
-    println!("Config is not valid");
-    Err(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        "Invalid config",
-    ))
+
+    conf.section(Some("General"))
+        .and_then(|section| section.get("nvtoolsdirectory"))
+        .map(|dir| dir.to_string())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid config"))
 }
 
-fn prompt_format_selection(files: &[PathBuf]) -> Vec<(PathBuf, &'static str)> {
-    let formats = ["bc1", "bc2", "bc3", "bc4", "bc5"];
+fn collect_image_files(args: &[String]) -> Result<Vec<ImageFile>, io::Error> {
+    Ok(args
+        .iter()
+        .map(PathBuf::from)
+        .filter(|path| path.is_file())
+        .filter_map(|path| {
+            let ext = path.extension()?.to_str()?.to_lowercase();
+            if ext == "tif" || ext == "png" {
+                Some((path, ext))
+            } else {
+                None
+            }
+        })
+        .map(|(path, extension)| {
+            let suffix = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| s.split('_').last())
+                .filter(|&s| VALID_SUFFIXES.contains(&s))
+                .map(String::from);
+
+            ImageFile {
+                file_path: path,
+                file_extension: Some(extension),
+                file_suffix: suffix,
+            }
+        })
+        .collect())
+}
+
+fn prompt_format_selection<'a>(files: &'a [ImageFile]) -> Vec<ImageFileWithFormat<'a>> {
+    let formats = [ImageFileFormat::Bc1, ImageFileFormat::Bc3];
 
     files
         .iter()
+        .filter(|file| file.file_suffix.is_none())
         .map(|file| {
             let selected_format = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt(format!(
                     "Image `{}` has no suffix. Choose the format to use:",
-                    file.with_extension("tif").display()
+                    if let Some(extension) = &file.file_extension {
+                        file.file_path
+                            .with_extension(extension)
+                            .display()
+                            .to_string()
+                    } else {
+                        file.file_path.display().to_string()
+                    }
                 ))
                 .default(0)
                 .items(&formats)
                 .interact()
                 .unwrap();
-            (file.clone(), formats[selected_format])
+
+            ImageFileWithFormat {
+                image_file: file,
+                image_format: formats[selected_format],
+            }
         })
         .collect()
 }
 
-fn segregate_files_by_suffix(files: &[PathBuf]) -> (Vec<(PathBuf, String)>, Vec<PathBuf>) {
-    let mut suffix_files = Vec::new();
-    let mut no_suffix_files = Vec::new();
-
-    for file in files {
-        if let Some(stem) = file.file_stem().and_then(|s| s.to_str()) {
-            let parts: Vec<&str> = stem.split('_').collect();
-            let suffix = parts.last().unwrap_or(&"");
-
-            if VALID_SUFFIXES.contains(suffix) {
-                suffix_files.push((file.clone(), suffix.to_string()));
-            } else {
-                no_suffix_files.push(file.clone());
-            }
-        }
-    }
-
-    (suffix_files, no_suffix_files)
-}
-
-fn create_pngs_if_needed(
-    files_with_formats: &[(PathBuf, &'static str)],
+fn generate_pngs_if_required(
+    files_with_format: &[ImageFileWithFormat],
 ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut temp_files = Vec::new();
 
-    for (file, format) in files_with_formats {
-        if *format == "bc3" {
-            let png_path = file.with_extension("png");
-            convert_tiff_to_png(file, &png_path)?;
+    for file in files_with_format {
+        if let Some(ext) = &file.image_file.file_extension {
+            if ext == "png" || file.image_format != ImageFileFormat::Bc3 {
+                continue;
+            }
+
+            let png_path = file.image_file.file_path.with_extension("png");
+            convert_tiff_to_png(&file.image_file.file_path, &png_path)?;
             temp_files.push(png_path);
         }
     }
@@ -130,49 +173,73 @@ fn create_pngs_if_needed(
     Ok(temp_files)
 }
 
-fn build_all_command_args(
-    suffix_files: &[(PathBuf, String)],
-    no_suffix_with_formats: &[(PathBuf, &'static str)],
-) -> Vec<Vec<String>> {
-    let mut args_list = Vec::new();
-
-    for (file, format) in no_suffix_with_formats {
-        let input = if *format == "bc3" {
-            file.with_extension("png")
-        } else {
-            file.clone()
-        };
-        let output = file.with_extension("dds");
-
-        args_list.push(build_args(
-            format,
-            "normal",
-            "box",
-            "5",
-            output.to_str().unwrap(),
-            input.to_str().unwrap(),
-            &[],
-        ));
+fn generate_command_args(files_with_format: &[ImageFileWithFormat]) -> Vec<Vec<String>> {
+    // Helper function to determine the input path
+    fn get_input_path(
+        file: &ImageFile,
+        format: &ImageFileFormat,
+        suffix: Option<&str>,
+    ) -> std::path::PathBuf {
+        match suffix {
+            Some(_) => file.file_extension.as_deref().map_or_else(
+                || file.file_path.clone(),
+                |extension| file.file_path.with_extension(extension),
+            ),
+            None if format == &ImageFileFormat::Bc3 => file.file_path.with_extension("png"),
+            _ => file.file_path.clone(),
+        }
     }
 
-    for (file, suffix) in suffix_files {
-        let (format, extra_args) = match suffix.as_str() {
-            "ao" | "rg" | "mt" | "hm" => ("bc4", vec!["--no-mip-gamma-correct"]),
-            "nm" => ("bc5", vec!["--no-mip-gamma-correct"]),
-            _ => continue,
-        };
-        let input = file.with_extension("tif");
-        let output = file.with_extension("dds");
+    // Helper function to determine the output path
+    fn get_output_path(file: &ImageFile) -> std::path::PathBuf {
+        file.file_path.with_extension("dds")
+    }
 
-        args_list.push(build_args(
-            format,
-            "normal",
-            "box",
-            "5",
-            output.to_str().unwrap(),
-            input.to_str().unwrap(),
-            &extra_args,
-        ));
+    // Helper function to determine the format and extra arguments based on suffix
+    fn get_format_and_args(suffix: &str) -> Option<(ImageFileFormat, Vec<&'static str>)> {
+        match suffix {
+            "ao" | "rg" | "mt" | "hm" | "lm" => {
+                Some((ImageFileFormat::Bc4, vec!["--no-mip-gamma-correct"]))
+            }
+            "nm" => Some((ImageFileFormat::Bc5, vec!["--no-mip-gamma-correct"])),
+            "dirt" => Some((ImageFileFormat::Bc1, vec![])),
+            _ => None,
+        }
+    }
+
+    let mut args_list = Vec::new();
+
+    for file_with_format in files_with_format {
+        let input = get_input_path(
+            &file_with_format.image_file,
+            &file_with_format.image_format,
+            file_with_format.image_file.file_suffix.as_deref(),
+        );
+        let output = get_output_path(&file_with_format.image_file);
+
+        if let Some(suffix) = &file_with_format.image_file.file_suffix {
+            if let Some((format, extra_args)) = get_format_and_args(suffix) {
+                args_list.push(build_args(
+                    &format,
+                    "normal",
+                    "box",
+                    "5",
+                    output.to_str().unwrap(),
+                    input.to_str().unwrap(),
+                    &extra_args,
+                ));
+            }
+        } else {
+            args_list.push(build_args(
+                &file_with_format.image_format,
+                "normal",
+                "box",
+                "5",
+                output.to_str().unwrap(),
+                input.to_str().unwrap(),
+                &[],
+            ));
+        }
     }
 
     args_list
@@ -211,7 +278,7 @@ fn cleanup_temp_files(temp_files: &[PathBuf]) -> io::Result<()> {
 }
 
 fn build_args(
-    format: &str,
+    format: &ImageFileFormat,
     quality: &str,
     mip_filter: &str,
     zcmp: &str,
