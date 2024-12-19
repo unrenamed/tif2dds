@@ -1,30 +1,42 @@
-use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use dialoguer::{theme::ColorfulTheme, Select};
 use image::{ImageFormat, ImageReader};
 use ini::Ini;
 use std::fs::{self, remove_file};
-use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, io};
 
 const VALID_SUFFIXES: [&str; 5] = ["ao", "rg", "mt", "hm", "nm"];
-const MAX_FILES_PER_PAGE: usize = 15;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let nvtools_path = load_nvtools_path("tif2dds_config.ini")?;
-    let tif_files = get_tif_files(".")?;
+    // Collect all arguments (excluding the program name)
+    let args: Vec<String> = env::args().skip(1).collect();
+
+    if args.is_empty() {
+        println!("No files selected.");
+        return Ok(());
+    }
+
+    println!("Selected file paths:");
+    for file in &args {
+        println!("{}", file);
+    }
+
+    let nvtools_path = load_nvtools_path()?;
+    let tif_files: Vec<PathBuf> = args
+        .iter()
+        .map(|path| PathBuf::from(path))
+        .filter(|path| {
+            path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("tif")
+        })
+        .collect();
 
     if tif_files.is_empty() {
         println!("No .tif files found in the folder.");
         return Ok(());
     }
 
-    let selected_files = prompt_file_selection(&tif_files);
-    if selected_files.is_empty() {
-        println!("You did not select anything :(");
-        return Ok(());
-    }
-
-    let (suffix_files, no_suffix_files) = segregate_files_by_suffix(&selected_files);
+    let (suffix_files, no_suffix_files) = segregate_files_by_suffix(&tif_files);
     let no_suffix_with_formats = prompt_format_selection(&no_suffix_files);
 
     let temp_pngs = create_pngs_if_needed(&no_suffix_with_formats)?;
@@ -43,7 +55,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn load_nvtools_path(config_path: &str) -> io::Result<String> {
+fn load_nvtools_path() -> io::Result<String> {
+    let current_exe = env::current_exe()?;
+    let exe_dir = current_exe
+        .parent()
+        .expect("Executable must have a parent directory");
+    let config_path = exe_dir.join("tif2dds_config.ini");
     let conf = Ini::load_from_file(config_path).expect("No config file is found.");
     if let Some(section) = conf.section(Some("General")) {
         if let Some(dir_path) = section.get("nvtoolsdirectory") {
@@ -55,41 +72,6 @@ fn load_nvtools_path(config_path: &str) -> io::Result<String> {
         io::ErrorKind::InvalidInput,
         "Invalid config",
     ))
-}
-
-fn get_tif_files(folder_path: &str) -> io::Result<Vec<PathBuf>> {
-    fs::read_dir(folder_path)?
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("tif") {
-                Some(Ok(path))
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-fn prompt_file_selection(tif_files: &[PathBuf]) -> Vec<PathBuf> {
-    let file_names: Vec<_> = tif_files
-        .iter()
-        .map(|path| path.display().to_string())
-        .collect();
-
-    let defaults = vec![true; file_names.len()];
-
-    let selections = MultiSelect::with_theme(&ColorfulTheme::default())
-        .with_prompt("Pick .tif files to transform to .dss")
-        .items(&file_names)
-        .defaults(&defaults)
-        .max_length(MAX_FILES_PER_PAGE)
-        .interact()
-        .unwrap();
-
-    selections
-        .into_iter()
-        .map(|i| tif_files[i].clone())
-        .collect()
 }
 
 fn prompt_format_selection(files: &[PathBuf]) -> Vec<(PathBuf, &'static str)> {
