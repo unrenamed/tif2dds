@@ -14,7 +14,7 @@ pub fn generate_config_file() -> io::Result<Option<PathBuf>> {
     if file_exists_and_user_declines(&config_path)? {
         return Ok(None);
     }
-    let nvtoolsdirectory = get_nvtools_directory_path();
+    let nvtoolsdirectory = get_nvtools_directory_path().replace("\\", "\\\\");
     write_config_file(&config_path, &nvtoolsdirectory)?;
     Ok(Some(config_path))
 }
