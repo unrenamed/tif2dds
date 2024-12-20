@@ -10,6 +10,7 @@ use clap::{arg, Command as CliCommand};
 use std::io::Write;
 
 const VALID_SUFFIXES: [&str; 7] = ["ao", "rg", "mt", "hm", "nm", "lm", "dirt"];
+const CONFIG_FILENAME: &str = "tif2dds_config.ini";
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum ImageFileFormat {
@@ -78,10 +79,12 @@ fn setup_cli() -> clap::Command {
 }
 
 fn handle_install() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Installing the script...");
+    println!("Starting the installation process...");
 
     if let Err(e) = generate_config_file() {
-        eprintln!("Error creating the config file: {}", e);
+        eprintln!("Failed to create the configuration file. Details: {}", e);
+    } else {
+        println!("Configuration file created successfully.");
     }
 
     let exe_path = get_executable_path()?;
@@ -90,11 +93,16 @@ fn handle_install() -> Result<(), Box<dyn std::error::Error>> {
         exe_path.replace("\\", "\\\\")
     );
 
+    println!("Registering the context menu options...");
     for file_type in [".tif", ".png"] {
         add_context_menu_for_file_type(file_type, "Convert to DDS", &script_command)?;
+        println!(
+            "Successfully added context menu for file type '{}'.",
+            file_type
+        );
     }
 
-    println!("The script finished installing!");
+    println!("Installation process completed successfully!");
     Ok(())
 }
 
@@ -106,21 +114,22 @@ fn handle_convert(sub_matches: &clap::ArgMatches) -> Result<(), Box<dyn std::err
         .collect();
 
     if paths.is_empty() {
-        return Err("No files selected.".into());
+        return Err("No files were selected for conversion.".into());
     }
 
-    println!("Selected file paths:");
+    println!("Files selected for conversion:");
     for file in &paths {
         println!("- \"{}\"", file.display());
     }
 
     convert_images_to_dds(&paths)?;
+    println!("Conversion completed successfully!");
     Ok(())
 }
 
 fn generate_config_file() -> io::Result<()> {
     let exe_dir = get_executable_directory()?;
-    let config_path = exe_dir.join("tif2dds_config.ini");
+    let config_path = exe_dir.join(CONFIG_FILENAME);
 
     if file_exists_and_user_declines(&config_path)? {
         return Ok(());
@@ -129,7 +138,11 @@ fn generate_config_file() -> io::Result<()> {
     let nvtoolsdirectory = get_nvtools_directory_path();
     write_config_file(&config_path, &nvtoolsdirectory)?;
 
-    println!("File created successfully at {}", config_path.display());
+    println!(
+        "Config file created successfully at {}",
+        config_path.display()
+    );
+
     Ok(())
 }
 
@@ -144,7 +157,7 @@ fn get_executable_directory() -> io::Result<PathBuf> {
 fn file_exists_and_user_declines(path: &Path) -> io::Result<bool> {
     if path.exists() {
         let override_file = Confirm::new()
-            .with_prompt("The .ini config file already exists. Do you want to override it?")
+            .with_prompt("The config file already exists. Do you want to override it?")
             .interact()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         return Ok(!override_file);
@@ -154,13 +167,13 @@ fn file_exists_and_user_declines(path: &Path) -> io::Result<bool> {
 
 fn get_nvtools_directory_path() -> String {
     Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Path to the folder containing nvttexport.exe:")
+        .with_prompt("Please enter the path to the folder containing Nvidia Texture CLI:")
         .validate_with({
             move |input: &String| -> Result<(), &str> {
                 if fs::metadata(input).map(|m| m.is_dir()).unwrap_or(false) {
                     Ok(())
                 } else {
-                    Err("This folder does not exist or is not a directory")
+                    Err("The specified folder does not exist or is not a directory. Please provide a valid path.")
                 }
             }
         })
@@ -213,19 +226,11 @@ fn add_context_menu_for_file_type(
     let (command_key, _) = shell_key.create_subkey("Command")?;
     command_key.set_value("", &command)?;
 
-    println!(
-        "Context menu entry added successfully for {} files!",
-        extension
-    );
     Ok(())
 }
 
 fn convert_images_to_dds(args: &[&PathBuf]) -> Result<(), Box<dyn std::error::Error>> {
     let image_files = collect_image_files(&args)?;
-    if image_files.is_empty() {
-        return Err("No .tif or .png files found.".into());
-    }
-
     let nvtools_path = load_nvtools_path()?;
     let files_with_format = prepare_files_with_format(&image_files);
     let temp_pngs = generate_pngs_if_required(&files_with_format)?;
@@ -234,22 +239,21 @@ fn convert_images_to_dds(args: &[&PathBuf]) -> Result<(), Box<dyn std::error::Er
 
     // Ensure cleanup always happens, regardless of success or failure
     if let Err(e) = cleanup_temp_files(&temp_pngs) {
-        eprintln!("Error during cleanup: {}", e);
+        eprintln!(
+            "Failed to delete temporary file. You may need to remove it manually. Details: {}",
+            e
+        );
     }
 
     // Propagate the command execution result
     execution_result?;
-
     Ok(())
 }
 
 fn load_nvtools_path() -> io::Result<String> {
-    let current_exe = env::current_exe()?;
-    let exe_dir = current_exe.parent().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "Executable directory not found.")
-    })?;
-    let config_path = exe_dir.join("tif2dds_config.ini");
-    let conf = Ini::load_from_file(config_path).expect("No config file is found.");
+    let exe_dir = get_executable_directory()?;
+    let config_path = exe_dir.join(CONFIG_FILENAME);
+    let conf = Ini::load_from_file(config_path).expect("Failed to load the config.");
 
     conf.section(Some("General"))
         .and_then(|section| section.get("nvtoolsdirectory"))
