@@ -1,10 +1,13 @@
+use dialoguer::{Confirm, Input};
 use dialoguer::{theme::ColorfulTheme, Select};
 use image::{ImageFormat, ImageReader};
 use ini::Ini;
-use std::fs::{self, remove_file};
+use std::fs::{self, remove_file, File};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, io};
+use clap::{arg, Command as CliCommand};
+use std::io::Write;
 
 const VALID_SUFFIXES: [&str; 7] = ["ao", "rg", "mt", "hm", "nm", "lm", "dirt"];
 
@@ -47,15 +50,7 @@ struct ImageFileWithFormat<'a> {
     extra_arguments: Vec<String>,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().skip(1).collect();
-    if args.is_empty() {
-        return Err("No files selected.".into());
-    }
-
-    println!("Selected file paths:");
-    args.iter().for_each(|file| println!("{}", file));
-
+fn convert_to_dds(args: &[&PathBuf]) -> Result<(), Box<dyn std::error::Error>> {
     let image_files = collect_image_files(&args)?;
     if image_files.is_empty() {
         return Err("No .tif or .png files found.".into());
@@ -92,10 +87,9 @@ fn load_nvtools_path() -> io::Result<String> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid config"))
 }
 
-fn collect_image_files(args: &[String]) -> Result<Vec<ImageFile>, io::Error> {
+fn collect_image_files(args: &[&PathBuf]) -> Result<Vec<ImageFile>, io::Error> {
     Ok(args
         .iter()
-        .map(PathBuf::from)
         .filter(|path| path.is_file())
         .filter_map(|path| {
             let ext = path.extension()?.to_str()?.to_lowercase();
@@ -114,7 +108,7 @@ fn collect_image_files(args: &[String]) -> Result<Vec<ImageFile>, io::Error> {
                 .map(String::from);
 
             ImageFile {
-                file_path: path,
+                file_path: (*path).clone(),
                 file_extension: Some(extension),
                 file_suffix: suffix,
             }
@@ -315,5 +309,149 @@ fn convert_tiff_to_png(input: &Path, output: &Path) -> Result<(), Box<dyn std::e
     let output_file = fs::File::create(output)?;
     img.write_to(&mut std::io::BufWriter::new(output_file), ImageFormat::Png)?;
     println!("Temporary PNG created: {}", output.display());
+    Ok(())
+}
+
+fn prompt_nvtoolsdirectory_path() -> String {
+    Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Path to the folder containing nvttexport.exe:")
+        .validate_with({
+            move |input: &String| -> Result<(), &str> {
+                if fs::metadata(input).map(|m| m.is_dir()).unwrap_or(false) {
+                    Ok(())
+                } else {
+                    Err("This folder does not exist or is not a directory")
+                }
+            }
+        })
+        .interact_text()
+        .unwrap()
+}
+
+fn generate_config_file() -> io::Result<()> {
+    let current_exe = env::current_exe()?;
+    let exe_dir = current_exe.parent().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, "Executable directory not found.")
+    })?;
+    let config_path = exe_dir.join("tif2dds_config.ini");
+    let path = Path::new(&config_path);
+
+    if path.exists() {
+        let override_file = Confirm::new()
+            .with_prompt("The .ini config file already exists. Do you want to override it?")
+            .interact()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        if !override_file {
+            return Ok(());
+        }
+    }
+
+    let nvtoolsdirectory: String = prompt_nvtoolsdirectory_path();
+
+    // Create or overwrite the file
+    let mut file = File::create(path)?;
+    writeln!(file, "[General]")?;
+    writeln!(file, "nvtoolsdirectory = {}", nvtoolsdirectory)?;
+
+    println!("File created successfully at {}", path.display());
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn add_context_menu_for_file_type(
+    extension: &str,
+    menu_name: &str,
+    _command: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let shell_key_path = format!(r"SystemFileAssociations\{}\Shell\{}", extension, menu_name);
+    println!("{}", shell_key_path);
+    Ok(())
+}
+
+#[cfg(windows)]
+fn add_context_menu_for_file_type(
+    extension: &str,
+    menu_name: &str,
+    command: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    // Open the HKEY_CLASSES_ROOT registry key
+    let hkcr = RegKey::predef(HKEY_CLASSES_ROOT);
+
+    // Create the context menu entry
+    let shell_key_path = format!(r"SystemFileAssociations\{}\Shell\{}", extension, menu_name);
+    let (shell_key, _) = hkcr.create_subkey(&shell_key_path)?;
+
+    // Set the context menu label
+    shell_key.set_value("", &menu_name)?;
+
+    // Add the command to execute
+    let (command_key, _) = shell_key.create_subkey("Command")?;
+    command_key.set_value("", &command)?;
+
+    println!(
+        "Context menu entry added successfully for {} files!",
+        extension
+    );
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = CliCommand::new("example")
+        .about("A CLI tool for converting image files to DDS using Nvidia Texture CLI")
+        .subcommand(CliCommand::new("install").about("Installs the application"))
+        .subcommand(
+            CliCommand::new("convert")
+                .about("Converts one or more image files to .dds format")
+                .arg_required_else_help(true)
+                .arg(
+                    arg!(<PATH> ... "Paths to image files to convert")
+                        .value_parser(clap::value_parser!(PathBuf)),
+                ),
+        )
+        .get_matches();
+
+    match matches.subcommand() {
+        Some(("install", _)) => {
+            println!("Installing the script...");
+            if let Err(e) = generate_config_file() {
+                eprintln!("Error creating .ini file: {}", e);
+            }
+            let exe_path = env::current_exe()?.display().to_string();
+            let script_command = format!(
+                r#"powershell.exe -NoProfile -Command "& \"{}\" convert \"%1\"""#,
+                exe_path.replace("\\", "\\\\")
+            );
+            println!("{}", script_command);
+            add_context_menu_for_file_type(".tif", "Convert to DDS", &script_command)?;
+            add_context_menu_for_file_type(".png", "Convert to DDS", &script_command)?;
+            println!("The script finished installing!");
+        }
+        Some(("convert", sub_matches)) => {
+            let paths = sub_matches
+                .get_many::<PathBuf>("PATH")
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+
+            if paths.is_empty() {
+                return Err("No files selected.".into());
+            }
+
+            println!("Selected file paths:");
+            paths
+                .iter()
+                .for_each(|file| println!("- \"{}\"", file.display()));
+
+            convert_to_dds(&paths)?;
+        }
+        _ => {
+            println!("Unknown command. Use `example help` for available commands.");
+        }
+    }
+
     Ok(())
 }

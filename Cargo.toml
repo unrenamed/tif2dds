@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = "4.5.23"
 dialoguer = "0.11.0"
 image = "0.25.5"
 rust-ini = "0.21.1"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52.0"
