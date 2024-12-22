@@ -64,10 +64,13 @@ jobs:
               EXEC=$PROJECT_NAME
           fi
           mv ./target/$TARGET/release/$EXEC ./$EXEC
-          # Create .tgz archive
-          tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC
-          # Create .zip archive
-          zip ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip $EXEC
+          if [[ $OS =~ ^windows.*$ ]]; then
+              # Create .zip archive
+              powershell Compress-Archive -Path ./$EXEC -DestinationPath ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip
+          else
+              # Create .tgz archive
+              tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC
+          fi
       - name: Archive artifact
         uses: actions/upload-artifact@v4
         with:
