@@ -63,13 +63,18 @@ jobs:
           else
               EXEC=$PROJECT_NAME
           fi
+
           mv ./target/$TARGET/release/$EXEC ./$EXEC
+
+          # Include README file (without extension) in the archive
+          README=README
+
           if [[ $OS =~ ^windows.*$ ]]; then
               # Create .zip archive
-              powershell Compress-Archive -Path ./$EXEC -DestinationPath ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip
+              powershell Compress-Archive -Path ./$EXEC, ./$README -DestinationPath ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip
           else
               # Create .tgz archive
-              tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC
+              tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC $README
           fi
       - name: Archive artifact
         uses: actions/upload-artifact@v4

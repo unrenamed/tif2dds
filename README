@@ -1,0 +1,86 @@
+                         _   _  __ ____     _     _     
+                        | |_(_)/ _|___ \ __| | __| |___ 
+                        | __| | |_  __) / _` |/ _` / __|
+                        | |_| |  _|/ __/ (_| | (_| \__ \
+                         \__|_|_| |_____\__,_|\__,_|___/
+
+README
+
+  tif2dds is a command line tool designed to automate the process of converting
+  image files from .TIF and .PNG formats to .DDS (DirectDraw Surface) using
+  Nvidia's Texture Tools Exporter. The tool will feature an interactive
+  interface with user prompts, allowing users to select specific options such as
+  the desired .DDS format (e.g., BC1, BC3) if an image lacks alpha channel
+  information.
+
+  Workflow:
+    
+    1. Installation and Context Menu:
+       During installation, the tool adds a "Convert to DDS" option to the 
+       right-click context menu for .TIF and .PNG files in Windows Explorer.
+       
+    2. File Selection:
+       The user right-clicks on one or more .TIF or .PNG files and selects 
+       "Convert to DDS" to begin the conversion process. Each selected file opens 
+       in a separate PowerShell window for conversion, which closes automatically 
+       after processing, freeing up memory.
+
+    3. Alpha Channel Prompt:
+       If an image lacks an alpha channel, the tool prompts the user to choose the 
+       appropriate .DDS format (e.g., BC1 or BC3).
+       
+    4. Conversion Process:
+       Nvidia's Texture Tools Exporter CLI is used to convert the files with selected 
+       settings, such as compression and mipmaps.
+
+    5. Output Location:
+       The converted .DDS files are saved in the same directory as the original 
+       files, which remain unchanged.
+
+AUTHORS
+
+  Nazar Poshtarenko a.k.a unrenamed. Email: renkonazbka@gmail.com
+
+CONTACT / BUGS
+
+  If you have problems, questions, ideas or suggestions, please contact us by
+  posting a new issue here: https://github.com/unrenamed/tif2dds/issues
+
+GIT
+
+  To download the latest source code off the GIT server, do this:
+
+    git clone https://github.com/unrenamed/tif2dds.git
+
+INSTALL
+
+  It is recommended to create a separate folder for the tif2dds related files.
+  You can choose any location that suits you.
+  
+  Once you have downloaded the executable, follow these steps to complete the
+  installation:
+  
+  1. Place the .exe file in the folder created before.
+  2. Open PowerShell.
+  3. Use cd to navigate to the folder where the .exe file is located.
+  4. Run .\tif2dds.exe install
+  
+  During the first installation, you will be prompted to provide the path to the
+  folder containing the NVIDIA Texture Tools Exporter file. This file should be
+  named nvtt_export.exe. You can either enter the path manually or copy and
+  paste it from the file explorer.
+  
+  If you have followed these steps correctly, you should see an output similar
+  to the one below in your terminal:
+  
+  > ✔ Please enter the path to the folder containing Nvidia Texture CLI: ·
+  > C:\path\to\cli Configuration file created successfully at
+  > C:\tif2dds\tif2dds_config.ini Registering the context menu options...
+  > Successfully added context menu for file type '.tif'. Successfully added
+  > context menu for file type '.png'. Installation process completed
+  > successfully!
+
+LICENSE
+
+  tif2dds is open-source under the GNU Affero General Public License Version 3
+  (AGPLv3) or any later version.
