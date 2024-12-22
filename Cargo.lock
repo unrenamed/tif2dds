@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "tif2dds"
-version = "0.1.0"
+version = "1.7.0"
 dependencies = [
  "clap",
  "dialoguer",

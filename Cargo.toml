@@ -1,6 +1,6 @@
 [package]
 name = "tif2dds"
-version = "0.1.0"
+version = "1.7.0"
 edition = "2021"
 authors = ["unrenamed <renkonazbka@gmail.com>"]
 description = """
