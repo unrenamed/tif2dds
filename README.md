@@ -1,7 +1,7 @@
 <h1 align="center">tif2dds</h1>
 
 <p align="center">
-    A Rust CLI tool to convert <b>.TIF</b> and <b>.PNG</b> to <b>.DDS</b> with format prompts.
+    A Rust command line utility that automates <b>.TIF</b> and <b>.PNG</b> conversion to <b>.DDS</b> with format prompts.
 </p>
 
 <div align="center">
