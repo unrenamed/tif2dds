@@ -64,12 +64,17 @@ jobs:
               EXEC=$PROJECT_NAME
           fi
           mv ./target/$TARGET/release/$EXEC ./$EXEC
+          # Create .tgz archive
           tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC
+          # Create .zip archive
+          zip ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip $EXEC
       - name: Archive artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.NAME }}-${{ env.TAG }}
-          path: ./artifacts/${{ env.PROJECT_NAME }}-${{ matrix.NAME }}-${{ env.TAG }}.tgz
+          path: |
+            ./artifacts/${{ env.PROJECT_NAME }}-${{ matrix.NAME }}-${{ env.TAG }}.tgz
+            ./artifacts/${{ env.PROJECT_NAME }}-${{ matrix.NAME }}-${{ env.TAG }}.zip
 
   # deploys to github releases on tag
   deploy:
@@ -87,4 +92,6 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ./artifacts/*.tgz
+          files: |
+            ./artifacts/*.tgz
+            ./artifacts/*.zip
