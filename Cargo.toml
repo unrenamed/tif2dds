@@ -2,6 +2,16 @@
 name = "tif2dds"
 version = "0.1.0"
 edition = "2021"
+authors = ["unrenamed <renkonazbka@gmail.com>"]
+description = """
+A Rust CLI tool to convert .TIF and .PNG to .DDS with format prompts.
+"""
+readme = "README.md"
+license-file = "LICENSE"
+homepage = "https://github.com/unrenamed/tif2dds"
+repository = "https://github.com/unrenamed/tif2dds"
+keywords = ["cli", "image-conversion", "dds", "tif", "png"]
+categories = ["command-line-utilities", "multimedia"]
 
 [dependencies]
 clap = "4.5.23"
