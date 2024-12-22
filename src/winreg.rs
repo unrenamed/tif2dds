@@ -44,8 +44,8 @@ fn add_context_menu_for_file_type(
 
     // Set the context menu label and separate it from other menu items
     shell_key.set_value("", &menu_name)?;
-    shell_key.set_value("SeparatorBefore", "")?;
-    shell_key.set_value("SeparatorAfter", "")?;
+    shell_key.set_value("SeparatorBefore", &"")?;
+    shell_key.set_value("SeparatorAfter", &"")?;
 
     // Add the command to execute
     let (command_key, _) = shell_key.create_subkey("Command")?;
