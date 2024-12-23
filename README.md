@@ -39,7 +39,7 @@ Once you have downloaded the executable, follow these steps to complete the inst
 
 1. Place the `.exe` file in the folder created before.
 
-2. Open `PowerShell`.
+2. Open `PowerShell` as administrator.
 
 3. Use `cd` to navigate to the folder where the `.exe` file is located.
 
@@ -64,7 +64,7 @@ Did you encounter any issues during the installation process? Feel free to open 
 
 During installation, a new context menu item is added for .TIF and .PNG files. Right-click on one or more of these files and select **Convert to DDS** to convert them to .DDS format.
 
-Due to Windows Registry limitations, each file opens in a separate PowerShell window, but don’t worry—most of these close automatically, freeing up memory. If an image lacks alpha channel information, you'll be prompted to choose the correct format.
+Due to Windows Registry limitations, each file opens in a separate PowerShell window, but don’t worry—they close automatically, freeing up memory. If an image lacks alpha channel information, you'll be prompted to choose the correct format.
 
 The converted .DDS file will be saved in the same directory as the original, which remains unchanged.
 
