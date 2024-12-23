@@ -62,11 +62,34 @@ Did you encounter any issues during the installation process? Feel free to open 
 
 ## How it works
 
-During installation, a new context menu item is added for .TIF and .PNG files. Right-click on one or more of these files and select **Convert to DDS** to convert them to .DDS format.
+**Installation and Context Menu:**
+During installation, the tool adds a "Convert to DDS" option to the right-click context menu for .TIF and .PNG files in Windows Explorer.
 
-Due to Windows Registry limitations, each file opens in a separate PowerShell window, but don’t worry—they close automatically, freeing up memory. If an image lacks alpha channel information, you'll be prompted to choose the correct format.
+**File Selection:**
+The user right-clicks on one or more .TIF or .PNG files and selects "Convert to DDS" to begin the conversion process. Each selected file opens in a separate PowerShell window for conversion, which closes automatically after processing, freeing up memory
 
-The converted .DDS file will be saved in the same directory as the original, which remains unchanged.
+**Alpha Channel Prompt:**
+If an image lacks an alpha channel, the tool prompts the user to choose the appropriate .DDS format (e.g., BC1 or BC3).
+
+**Conversion Process:**
+Nvidia's Texture Tools Exporter CLI is used to convert the files with selected settings, such as compression and mipmaps
+
+**Output Location:**
+The converted .DDS files are saved in the same directory as the original files, which remain unchanged.
+
+### Suffix-based Format Mapping
+
+The tool automatically assigns specific formats to files based on their suffixes, streamlining the process of format selection:
+
+| Format  |                 Suffix                 |
+| ------- | :------------------------------------: |
+| **BC1** |                `\_dirt`                |
+| **BC4** | `\_ao`, `\_rg`, `\_mt`, `\_hm`, `\_lm` |
+| **BC5** |                 `\_nm`                 |
+
+### Handling Unsupported Suffixes
+
+If a file does not have a supported suffix, the tool will prompt you to manually select an appropriate .DDS format (e.g., BC1 or BC3) through a PowerShell window.
 
 ## Key Libraries:
 
