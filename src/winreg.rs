@@ -3,7 +3,7 @@ use std::env;
 pub fn register_context_menu_options() -> Result<(), Box<dyn std::error::Error>> {
     let exe_path = env::current_exe()?.display().to_string();
     let script_command = format!(
-        r#"powershell.exe -NoProfile -Command "& \"{}" convert \"%1\"""#,
+        r#"powershell.exe -NoProfile -Command "& \"{}\" convert \"%1\"""#,
         exe_path.replace("\\", "\\\\")
     );
 
