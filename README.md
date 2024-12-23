@@ -63,18 +63,23 @@ Did you encounter any issues during the installation process? Feel free to open 
 ## How it works
 
 **Installation and Context Menu:**
+
 During installation, the tool adds a "Convert to DDS" option to the right-click context menu for .TIF and .PNG files in Windows Explorer.
 
 **File Selection:**
+
 The user right-clicks on one or more .TIF or .PNG files and selects "Convert to DDS" to begin the conversion process. Each selected file opens in a separate PowerShell window for conversion, which closes automatically after processing, freeing up memory
 
 **Alpha Channel Prompt:**
+
 If an image lacks an alpha channel, the tool prompts the user to choose the appropriate .DDS format (e.g., BC1 or BC3).
 
 **Conversion Process:**
+
 Nvidia's Texture Tools Exporter CLI is used to convert the files with selected settings, such as compression and mipmaps
 
 **Output Location:**
+
 The converted .DDS files are saved in the same directory as the original files, which remain unchanged.
 
 ### Suffix-based Format Mapping
