@@ -86,11 +86,11 @@ The converted .DDS files are saved in the same directory as the original files, 
 
 The tool automatically assigns specific formats to files based on their suffixes, streamlining the process of format selection:
 
-| Format  |                 Suffix                 |
-| ------- | :------------------------------------: |
-| **BC1** |                `\_dirt`                |
-| **BC4** | `\_ao`, `\_rg`, `\_mt`, `\_hm`, `\_lm` |
-| **BC5** |                 `\_nm`                 |
+| Format  |              Suffix               |
+| ------- | :-------------------------------: |
+| **BC1** |              `_dirt`              |
+| **BC4** | `_ao`, `_rg`, `_mt`, `_hm`, `_lm` |
+| **BC5** |               `_nm`               |
 
 ### Handling Unsupported Suffixes
 

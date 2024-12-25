@@ -63,7 +63,7 @@ INSTALL
   1. Place the .exe file in the folder created before.
   2. Open PowerShell as administrator.
   3. Use `cd` to navigate to the folder where the .exe file is located.
-  4. Run `.\tif2dds.exe` install
+  4. Run `.\tif2dds.exe install`
   
   During the first installation, you will be prompted to provide the path to the
   folder containing the NVIDIA Texture Tools Exporter file. This file should be
