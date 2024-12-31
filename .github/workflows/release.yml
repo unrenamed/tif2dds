@@ -39,6 +39,9 @@ jobs:
       - name: Extract project name
         shell: bash
         run: echo "PROJECT_NAME=$(grep '^name' Cargo.toml | sed 's/^name *= *//;s/\"//g')" >> $GITHUB_ENV
+      - name: Extract project version
+        shell: bash
+        run: echo "PROJECT_VERSION=$(grep '^version' Cargo.toml | sed 's/^version *= *//;s/\"//g')" >> $GITHUB_ENV
       - name: Set release tag
         shell: bash
         run: |
@@ -50,9 +53,17 @@ jobs:
           echo "TAG=$TAG" >> $GITHUB_ENV
       - name: Run build
         run: cargo build --locked --release --verbose --target ${{ env.TARGET }}
-      - name: List target
+      - name: Set app version
         shell: bash
-        run: ls -R ./target
+        run: |
+          sed -i 's/app_version="<version>"/app_version="${{ env.PROJECT_VERSION }}"/' uninstall.bat
+          sed -i 's/Version: <version>/Version: ${{ env.PROJECT_VERSION }}/' README
+      - name: Show updated files
+        run: |
+          echo "Updated uninstall.bat:"
+          cat uninstall.bat
+          echo "Updated README:"
+          cat README
       - name: Compress
         shell: bash
         run: |
@@ -69,12 +80,15 @@ jobs:
           # Include README file (without extension) in the archive
           README=README
 
+          # Include uninstall.bat file in the archive
+          UNINSTALL=uninstall.bat
+
           if [[ $OS =~ ^windows.*$ ]]; then
               # Create .zip archive
-              powershell Compress-Archive -Path ./$EXEC, ./$README -DestinationPath ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip
+              powershell Compress-Archive -Path ./$EXEC, ./$README, ./$UNINSTALL -DestinationPath ./artifacts/$PROJECT_NAME-$NAME-$TAG.zip
           else
               # Create .tgz archive
-              tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC $README
+              tar -czf ./artifacts/$PROJECT_NAME-$NAME-$TAG.tgz $EXEC $README $UNINSTALL
           fi
       - name: Archive artifact
         uses: actions/upload-artifact@v4

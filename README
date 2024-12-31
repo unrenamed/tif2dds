@@ -4,6 +4,8 @@
                         | |_| |  _|/ __/ (_| | (_| \__ \
                          \__|_|_| |_____\__,_|\__,_|___/
 
+                                Version: <version>
+
 README
 
   tif2dds is a command line tool designed to automate the process of converting
