@@ -3,9 +3,7 @@ name = "tif2dds"
 version = "1.7.0"
 edition = "2021"
 authors = ["unrenamed <renkonazbka@gmail.com>"]
-description = """
-A Rust CLI tool to convert .TIF and .PNG to .DDS with format prompts.
-"""
+description = "A Rust-based command line tool designed to automate the process of converting image files from .TIF and .PNG formats to .DDS (DirectDraw Surface) using Nvidia's Texture Tools Exporter."
 readme = "README.md"
 license-file = "LICENSE"
 homepage = "https://github.com/unrenamed/tif2dds"
