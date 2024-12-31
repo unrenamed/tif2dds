@@ -60,6 +60,10 @@ Installation process completed successfully!
 
 Did you encounter any issues during the installation process? Feel free to open a new issue here: https://github.com/unrenamed/tif2dds/issues.
 
+## Uninstall Guide
+
+To uninstall the application, run the `uninstall.bat` file as an administrator. This script will remove all registry entries related to the app. Once that is done, you can delete the folder containing the executable.
+
 ## How it works
 
 **Installation and Context Menu:**

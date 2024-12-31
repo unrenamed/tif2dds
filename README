@@ -82,6 +82,16 @@ INSTALL
   > context menu for file type '.png'. Installation process completed
   > successfully!
 
+UNINSTALL
+
+  To uninstall the application, run the uninstall.bat file as an administrator. 
+  This script will remove all registry entries related to the app. Once that is done,
+  you can delete the folder containing the executable, the uninstall script, and this 
+  README. 
+  
+  If you do not have the uninstall.bat script, please contact the person who provided 
+  you with this README or the authors of the project for assistance.
+
 LICENSE
 
   tif2dds is open-source under the GNU Affero General Public License Version 3
