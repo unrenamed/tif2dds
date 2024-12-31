@@ -10,6 +10,7 @@ fn main() -> AppResult {
 
     match matches.subcommand() {
         Some(("install", _)) => handle_install()?,
+        Some(("uninstall", _)) => handle_uninstall()?,
         Some(("convert", sub_matches)) => handle_convert(sub_matches)?,
         _ => unreachable!(),
     }
@@ -33,6 +34,14 @@ fn handle_install() -> AppResult {
     winreg::register_context_menu_options()?;
 
     println!("Installation process completed successfully!");
+    Ok(())
+}
+
+fn handle_uninstall() -> AppResult {
+    println!("Uninstalling the script...");
+    println!("Unregistering the context menu options...");
+    winreg::unregister_context_menu_options()?;
+    println!("The script is uninstalled successfully!");
     Ok(())
 }
 

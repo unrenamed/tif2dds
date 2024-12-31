@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
-use clap::arg;
+use clap::{arg, crate_description, crate_name, crate_version};
 
 pub fn setup_cli() -> clap::Command {
-    clap::Command::new("example")
-        .about("A CLI tool for converting image files to DDS using Nvidia Texture CLI")
+    clap::Command::new(crate_name!())
+        .version(crate_version!())
+        .about(crate_description!())
         .subcommand(clap::Command::new("install").about("Installs the application"))
         .subcommand(
             clap::Command::new("convert")
@@ -15,4 +16,5 @@ pub fn setup_cli() -> clap::Command {
                         .value_parser(clap::value_parser!(PathBuf)),
                 ),
         )
+        .subcommand(clap::Command::new("uninstall").about("Uninstalls the application"))
 }

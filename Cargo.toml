@@ -14,7 +14,7 @@ keywords = ["cli", "image-conversion", "dds", "tif", "png"]
 categories = ["command-line-utilities", "multimedia"]
 
 [dependencies]
-clap = "4.5.23"
+clap = { version = "4.5.3", features = ["cargo"] }
 dialoguer = "0.11.0"
 image = "0.25.5"
 rust-ini = "0.21.1"
