@@ -6,12 +6,9 @@ SET app_version="<version>"
 SET script_version="1.0"
 
 echo =============================================
-echo
 echo   %app_name% Uninstaller [App Version %app_version%, Script Version %script_version%]
 echo   Executing from: %script_dir%
-echo
 echo =============================================
-echo
 
 REM Check if the executable exists
 if not exist "%script_dir%%app_executable%" (
